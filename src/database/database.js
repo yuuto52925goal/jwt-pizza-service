@@ -99,6 +99,31 @@ class DB {
     }
   }
 
+  async getUsers(page = 0, limit = 10, nameFilter = '*') {
+    page = Math.max(0, parseInt(page) || 0);
+    limit = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    nameFilter = nameFilter.replace(/\*/g, '%');
+
+    const connection = await this.getConnection();
+    try {
+      let users = await this.query(connection, `SELECT id, name, email FROM user WHERE name LIKE ? ORDER BY id LIMIT ${limit + 1} OFFSET ${page * limit}`, [nameFilter]);
+
+      const more = users.length > limit;
+      if (more) {
+        users = users.slice(0, limit);
+      }
+
+      // ponytail: one roles query per user, fine at page size <= 100
+      for (const user of users) {
+        const roles = await this.query(connection, `SELECT role, objectId FROM userRole WHERE userId=?`, [user.id]);
+        user.roles = roles.map((r) => ({ objectId: r.objectId || undefined, role: r.role }));
+      }
+      return [users, more];
+    } finally {
+      connection.end();
+    }
+  }
+
   async loginUser(userId, token) {
     token = this.getTokenSignature(token);
     const connection = await this.getConnection();
