@@ -97,8 +97,32 @@ describe('list users as admin', () => {
   });
 });
 
-test('delete user', async () => {
-  const res = await request(app).delete(`/api/user/${diner.id}`).set('Authorization', `Bearer ${dinerToken}`);
+test('delete user unauthorized', async () => {
+  const res = await request(app).delete(`/api/user/${diner.id}`);
+  expect(res.status).toBe(401);
+});
+
+test('delete user forbidden for non-admin', async () => {
+  const { user: other } = await registerDiner();
+  const res = await request(app).delete(`/api/user/${other.id}`).set('Authorization', `Bearer ${dinerToken}`);
+  expect(res.status).toBe(403);
+});
+
+test('admin can delete user', async () => {
+  const adminToken = await login(await createAdminUser());
+  const name = randomName();
+  const { body } = await request(app).post('/api/auth').send({ name, email: `${name}@test.com`, password: 'a' });
+
+  const res = await request(app).delete(`/api/user/${body.user.id}`).set('Authorization', `Bearer ${adminToken}`);
   expect(res.status).toBe(200);
-  expect(res.body.message).toBe('not implemented');
+  expect(res.body.message).toBe('user deleted');
+
+  const list = await request(app).get(`/api/user?name=${name}`).set('Authorization', `Bearer ${adminToken}`);
+  expect(list.body.users).toEqual([]);
+
+  const relogin = await request(app).put('/api/auth').send({ email: `${name}@test.com`, password: 'a' });
+  expect(relogin.status).not.toBe(200);
+
+  const oldToken = await request(app).get('/api/user/me').set('Authorization', `Bearer ${body.token}`);
+  expect(oldToken.status).toBe(401);
 });
