@@ -143,3 +143,10 @@ jobs:
       - name: Deploy new container
         run: |
           aws ecs update-service --cluster jwt-pizza-service --service jwt-pizza-service --force-new-deployment
+
+      - name: Annotate deployment in Grafana
+        run: |
+          curl -s -X POST https://gentlecucumber165.grafana.net/api/annotations \
+          -H "Authorization: Bearer ${{ secrets.GRAFANA_ACCESS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"dashboardUID":"ax4w42", "panelId":1, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
